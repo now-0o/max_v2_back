@@ -1,28 +1,12 @@
-const { DataTypes } = require("sequelize");
-const sequelize = require("../config/database");
-
 const User = sequelize.define("User", {
-  kakaoId: {
-    type: DataTypes.STRING,
-    allowNull: false,
-    unique: true,
+  id: {
+    type: DataTypes.INTEGER,      // ✅ INT로 통일
+    autoIncrement: true,
+    primaryKey: true,
   },
-  name: {
-    type: DataTypes.STRING,
-    allowNull: false, // 닉네임을 여기 저장
-  },
-  gender: {
-    type: DataTypes.STRING, // "male", "female" 등
-    allowNull: true,
-  },
-  phone: {
-    type: DataTypes.STRING,
-    allowNull: true,
-  },
-  highschool: {
-    type: DataTypes.STRING,
-    allowNull: true,
-  },
+  kakaoId: { type: DataTypes.STRING, allowNull: false, unique: true },
+  name: { type: DataTypes.STRING, allowNull: false },
+  gender: DataTypes.STRING,
+  phone: DataTypes.STRING,
+  highschool: DataTypes.STRING,
 });
-
-module.exports = User;
