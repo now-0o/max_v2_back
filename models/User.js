@@ -1,12 +1,7 @@
 const { DataTypes } = require("sequelize");
-const sequelize = require("../config/database");  // ✅ sequelize 인스턴스 import
+const sequelize = require("../config/database");
 
 const User = sequelize.define("User", {
-  id: {
-    type: DataTypes.INTEGER,
-    autoIncrement: true,
-    primaryKey: true,
-  },
   kakaoId: {
     type: DataTypes.STRING,
     allowNull: false,
@@ -14,11 +9,20 @@ const User = sequelize.define("User", {
   },
   name: {
     type: DataTypes.STRING,
-    allowNull: false,
+    allowNull: false, // 닉네임을 여기 저장
   },
-  gender: DataTypes.STRING,
-  phone: DataTypes.STRING,
-  highschool: DataTypes.STRING,
+  gender: {
+    type: DataTypes.STRING, // "male", "female" 등
+    allowNull: true,
+  },
+  phone: {
+    type: DataTypes.STRING,
+    allowNull: true,
+  },
+  highschool: {
+    type: DataTypes.STRING,
+    allowNull: true,
+  },
 });
 
 module.exports = User;

@@ -1,8 +1,8 @@
 const { DataTypes } = require("sequelize");
-// ❌ 여기 sequelize 인스턴스 import가 없음
+const sequelize = require("../config/database");
 const User = require("./User");
 
-const ExamScore = sequelize.define(   // 여기서 ReferenceError 발생 가능
+const ExamScore = sequelize.define(
   "ExamScore",
   {
     id: { type: DataTypes.INTEGER, autoIncrement: true, primaryKey: true },
@@ -12,7 +12,7 @@ const ExamScore = sequelize.define(   // 여기서 ReferenceError 발생 가능
       allowNull: false,
     },
     scores: {
-      type: DataTypes.JSON,
+      type: DataTypes.JSON, // 전체 성적을 JSON으로 저장
       allowNull: false,
     },
   },
@@ -22,7 +22,7 @@ const ExamScore = sequelize.define(   // 여기서 ReferenceError 발생 가능
     indexes: [
       {
         unique: true,
-        fields: ["userId", "mode"],
+        fields: ["userId", "mode"], // 유저당 before/after 하나씩만
       },
     ],
   }
