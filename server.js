@@ -3,9 +3,9 @@ const cors = require("cors");
 const dotenv = require("dotenv");
 const { sequelize } = require("./models");
 const authRoutes = require("./routes/auth");
-const schoolRoutes = require("./routes/School");
+const schoolRoutes = require("./routes/school");
 const examScoreRoutes = require("./routes/examScoreRoutes");
-const analyzeRoutes = require('./routes/Analyzeroutes');
+const analyzeRoutes = require('./routes/analyzeroutes');
 
 dotenv.config();
 
