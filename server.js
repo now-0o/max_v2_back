@@ -3,8 +3,9 @@ const cors = require("cors");
 const dotenv = require("dotenv");
 const { sequelize } = require("./models");
 const authRoutes = require("./routes/auth");
-const schoolRoutes = require("./routes/school");
+const schoolRoutes = require("./routes/School");
 const examScoreRoutes = require("./routes/examScoreRoutes");
+const analyzeRoutes = require('./routes/Analyzeroutes');
 
 dotenv.config();
 
@@ -24,6 +25,7 @@ app.use(
 app.use("/auth", authRoutes);
 app.use("/api/schools", schoolRoutes);
 app.use("/api/exam-scores", examScoreRoutes);
+app.use('/api/analyze', analyzeRoutes);
 
 (async () => {
   try {
