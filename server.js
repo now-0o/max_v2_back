@@ -15,7 +15,18 @@ app.use(express.json());
 const cookieParser = require("cookie-parser");
 app.use(cookieParser());
 
-app.use(cors());
+const allowedOrigins = [
+  'http://localhost:3000',
+  'http://maxsportsdj.cafe24.com'
+];
+
+app.use(cors({
+  origin(origin, cb) {
+    if (!origin || allowedOrigins.includes(origin)) return cb(null, true);
+    return cb(new Error('Not allowed by CORS'));
+  },
+  credentials: true,
+}));
 
 
 app.use("/auth", authRoutes);
