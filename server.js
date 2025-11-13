@@ -17,7 +17,7 @@ app.use(cookieParser());
 
 const allowedOrigins = [
   'http://localhost:3000',
-  'http://maxsportsdj.cafe24.com'
+  'http://maxsportsdj.cafe24.com:3000'
 ];
 
 app.use(cors({
