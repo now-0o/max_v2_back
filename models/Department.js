@@ -40,31 +40,6 @@ const Department = sequelize.define("Department", {
         defaultValue: 1000,
         comment: '수능 성적 총 환산점수 만점 (예: 1000점)'
     },
-    calculation_type: {
-        type: DataTypes.ENUM('기본비율', '특수공식'),
-        allowNull: false,
-        comment: '점수 계산 유형 (기본비율 / 특수공식)'
-    },
-    korean_ratio: {
-        type: DataTypes.FLOAT,
-        allowNull: true,
-        comment: '국어 반영 비율 (0.0 ~ 1.0)'
-    },
-    math_ratio: {
-        type: DataTypes.FLOAT,
-        allowNull: true,
-        comment: '수학 반영 비율 (0.0 ~ 1.0)'
-    },
-    inquiry_ratio: {
-        type: DataTypes.FLOAT,
-        allowNull: true,
-        comment: '탐구 반영 비율 (0.0 ~ 1.0)'
-    },
-    english_ratio: {
-        type: DataTypes.FLOAT,
-        allowNull: true,
-        comment: '영어 반영 비율 (0.0 ~ 1.0)'
-    },
     inquiry_subject_count: {
         type: DataTypes.INTEGER,
         allowNull: true,
@@ -76,11 +51,6 @@ const Department = sequelize.define("Department", {
         allowNull: false,
         defaultValue: 'NONE',
         comment: '한국사 가산점 적용 유형 (A: 선 비율 후 가산, B: 선 가산 후 비율)'
-    },
-    special_formula: {
-        type: DataTypes.TEXT,
-        allowNull: true,
-        comment: '특수공식 계산에 사용될 문자열 공식'
     },
     cutline_score: {
         type: DataTypes.FLOAT,

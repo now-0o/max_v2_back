@@ -4,7 +4,8 @@ const {
   ExamScore, 
   Department, 
   School, 
-  DepartmentScoreConfig, 
+  DepartmentScoreRule,
+  DepartmentSubjectConfig,
   GradeConversion, 
   CollegeMaxScore,
   UserChoice,
@@ -55,7 +56,7 @@ router.post('/', async (req, res) => {
 
     console.log('\n📊 원본 성적 데이터:', JSON.stringify(rawScores, null, 2));
 
-    // ✅ 성적 데이터 변환 (Subject ID → korean, math 등)
+    // 성적 데이터 변환 (Subject ID → korean, math 등)
     const userScores = await convertScoresToStandardFormat(rawScores);
     console.log('\n🔄 변환된 성적 데이터:', JSON.stringify(userScores, null, 2));
 
@@ -102,16 +103,15 @@ router.post('/', async (req, res) => {
 
     const maxScoreMap = {};
     maxScores.forEach(ms => {
-      maxScoreMap[ms.subject_code] = ms.max_standard_score; // ✅ 수정
+      maxScoreMap[ms.subject_code] = ms.max_standard_score;
     });
 
     console.log('\n📈 최고점 데이터:', maxScoreMap);
 
-    // ✅ 최고점 데이터가 없으면 기본값 사용
+    // 기본값 설정
     if (!maxScoreMap.KOR_MAX) maxScoreMap.KOR_MAX = 150;
     if (!maxScoreMap.MATH_MAX) maxScoreMap.MATH_MAX = 150;
     if (!maxScoreMap.INQUIRY_MAX) maxScoreMap.INQUIRY_MAX = 70;
-    console.log('📈 기본값 적용 후:', maxScoreMap);
 
     // 4. 각 학과별로 환산점수 계산
     const results = [];
@@ -136,8 +136,8 @@ router.post('/', async (req, res) => {
             convertedScore: convertedScore,
             totalScore: dept.total_score || 1000,
             percentage: ((convertedScore / (dept.total_score || 1000)) * 100).toFixed(2),
-            cutlineScore: dept.cutline_score || null,  // ✅ 커트라인 추가
-            isPassed: dept.cutline_score ? convertedScore >= dept.cutline_score : null  // ✅ 합격 여부
+            cutlineScore: dept.cutline_score || null,
+            isPassed: dept.cutline_score ? convertedScore >= dept.cutline_score : null
           });
           console.log(`✅ 학과 ${dept.id} 추가됨 - 점수: ${convertedScore}`);
         } else {
@@ -177,7 +177,7 @@ router.post('/', async (req, res) => {
   }
 });
 
-// ✅ 성적 데이터 변환 (Subject ID → korean, math 등)
+// 성적 데이터 변환 (Subject ID → korean, math 등)
 async function convertScoresToStandardFormat(rawScores) {
   const converted = {};
 
@@ -200,38 +200,42 @@ async function convertScoresToStandardFormat(rawScores) {
 
     console.log(`\n📝 처리 중: Subject ${subjectId} → ${subjectName}`);
 
-    // ✅ 과목명으로 매핑
     const lowerName = subjectName.toLowerCase();
     
     if (lowerName.includes('국어') || lowerName === 'korean') {
       converted.korean = convertScoreData(scoreData.default);
+      converted.korean.subjectId = parseInt(subjectId);
       console.log(`  ✅ 국어 변환:`, converted.korean);
     } 
     else if (lowerName.includes('수학') || lowerName === 'math') {
       converted.math = convertScoreData(scoreData.default);
+      converted.math.subjectId = parseInt(subjectId);
       console.log(`  ✅ 수학 변환:`, converted.math);
     } 
     else if (lowerName.includes('영어') || lowerName === 'english') {
       converted.english = convertScoreData(scoreData.default);
+      converted.english.subjectId = parseInt(subjectId);
       console.log(`  ✅ 영어 변환:`, converted.english);
     } 
     else if (lowerName.includes('한국사') || lowerName === 'korean history' || lowerName === 'history') {
       converted.korean_history = convertScoreData(scoreData.default);
+      converted.korean_history.subjectId = parseInt(subjectId);
       console.log(`  ✅ 한국사 변환:`, converted.korean_history);
     } 
     else if (lowerName.includes('탐구') || lowerName === 'inquiry' || lowerName.includes('사회') || lowerName.includes('과학')) {
-      // 탐구 과목
       if (scoreData['탐구1']) {
         converted.inquiry1 = convertScoreData(scoreData['탐구1']);
+        converted.inquiry1.subjectId = parseInt(subjectId);
         console.log(`  ✅ 탐구1 변환:`, converted.inquiry1);
       }
       if (scoreData['탐구2']) {
         converted.inquiry2 = convertScoreData(scoreData['탐구2']);
+        converted.inquiry2.subjectId = parseInt(subjectId);
         console.log(`  ✅ 탐구2 변환:`, converted.inquiry2);
       }
-      // default가 있으면 inquiry1으로
       if (scoreData.default && !converted.inquiry1) {
         converted.inquiry1 = convertScoreData(scoreData.default);
+        converted.inquiry1.subjectId = parseInt(subjectId);
         console.log(`  ✅ 탐구1(default) 변환:`, converted.inquiry1);
       }
     }
@@ -240,7 +244,7 @@ async function convertScoresToStandardFormat(rawScores) {
   return converted;
 }
 
-// ✅ 점수 데이터 변환
+// 점수 데이터 변환
 function convertScoreData(data) {
   if (!data) return null;
 
@@ -253,33 +257,38 @@ function convertScoreData(data) {
   };
 }
 
-// 학과별 환산점수 계산 함수
+// 학과별 환산점수 계산
 async function calculateDepartmentScore(department, userScores, maxScoreMap) {
   console.log(`\n===== 학과 ${department.id} (${department.name}) 계산 시작 =====`);
   
-  // DepartmentScoreConfig 조회
-  const scoreConfigs = await DepartmentScoreConfig.findAll({
+  // 1. DepartmentSubjectConfig 조회 (과목별 설정)
+  const subjectConfigs = await DepartmentSubjectConfig.findAll({
     where: { departmentId: department.id }
   });
 
-  console.log(`- scoreConfigs 개수: ${scoreConfigs.length}`);
+  console.log(`- subjectConfigs 개수: ${subjectConfigs.length}`);
   
-  if (scoreConfigs.length === 0) {
-    console.log(`❌ scoreConfigs가 없어서 null 반환`);
+  if (subjectConfigs.length === 0) {
+    console.log(`❌ subjectConfigs가 없어서 null 반환`);
     return null;
   }
 
-  console.log('- scoreConfigs 상세:');
-  scoreConfigs.forEach(sc => {
-    console.log(`  * ${sc.subject_type}: score_type=${sc.score_type}, max_score_method=${sc.max_score_method}`);
-  });
-
-  // GradeConversion 조회 (영어, 한국사)
-  const gradeConversions = await GradeConversion.findAll({
+  // 2. DepartmentScoreRule 조회 (점수 반영 규칙)
+  const scoreRules = await DepartmentScoreRule.findAll({
     where: { departmentId: department.id }
   });
 
-  console.log(`- gradeConversions 개수: ${gradeConversions.length}`);
+  console.log(`- scoreRules 개수: ${scoreRules.length}`);
+  
+  if (scoreRules.length === 0) {
+    console.log(`❌ scoreRules가 없어서 null 반환`);
+    return null;
+  }
+
+  // 3. GradeConversion 조회 (영어, 한국사)
+  const gradeConversions = await GradeConversion.findAll({
+    where: { departmentId: department.id }
+  });
 
   const gradeMap = {};
   gradeConversions.forEach(gc => {
@@ -288,390 +297,187 @@ async function calculateDepartmentScore(department, userScores, maxScoreMap) {
     }
     gradeMap[gc.subject_code][gc.grade] = gc.converted_score;
   });
-  
+
   console.log(`- gradeMap:`, gradeMap);
 
-  // ✅ 과목별 실제 점수 계산 (정규화 없이)
-  const subjectScores = {};
+  // 4. 각 과목별 점수 계산
+  const calculatedScores = {};
 
-  for (const config of scoreConfigs) {
-    const subjectType = config.subject_type;
-    let rawScore = null;
+  for (const config of subjectConfigs) {
+    const subjectId = config.subjectId;
+    const scoreType = config.score_type;
+    
+    console.log(`\n  🔍 과목 ${subjectId} 처리 (score_type: ${scoreType})`);
 
-    console.log(`\n  🔍 처리 중: ${subjectType} (score_type: ${config.score_type})`);
+    const score = await calculateSubjectScore(
+      subjectId,
+      scoreType,
+      config,
+      userScores,
+      maxScoreMap,
+      gradeMap,
+      department
+    );
 
-    // 원점수 가져오기
-    if (subjectType === 'korean') {
-      rawScore = getSubjectScore(userScores, 'korean', config.score_type);
-      console.log(`    - 국어 원점수: ${rawScore}`);
-    } else if (subjectType === 'math') {
-      rawScore = getSubjectScore(userScores, 'math', config.score_type);
-      console.log(`    - 수학 원점수: ${rawScore}`);
-    } else if (subjectType === 'inquiry') {
-      const inquiryCount = department.inquiry_subject_count || 1;
-      rawScore = getInquiryScore(userScores, config.score_type, inquiryCount);
-      console.log(`    - 탐구 원점수: ${rawScore} (과목수: ${inquiryCount})`);
-    } else if (subjectType === 'english') {
-      const englishGrade = userScores.english?.grade;
-      console.log(`    - 영어 등급: ${englishGrade}`);
-      
-      if (englishGrade && gradeMap.ENGLISH && gradeMap.ENGLISH[englishGrade]) {
-        subjectScores.english = gradeMap.ENGLISH[englishGrade];
-        console.log(`    - 영어 변환점수: ${subjectScores.english}`);
-      } else if (config.score_type === 'fixed_max_score' && config.max_score_value) {
-        subjectScores.english = getDefaultEnglishScore(englishGrade, config.max_score_value);
-        console.log(`    - 영어 기본 변환점수: ${subjectScores.english}`);
-      } else {
-        console.log(`    - 영어 변환표 없음`);
-      }
-      continue;
+    if (score !== null) {
+      calculatedScores[subjectId] = score;
+      console.log(`    ✅ 과목 ${subjectId} 점수: ${score}`);
+    } else {
+      console.log(`    ⚠️ 과목 ${subjectId} 점수 계산 실패`);
     }
-
-    if (rawScore === null) {
-      console.log(`    ❌ rawScore가 null이므로 스킵`);
-      continue;
-    }
-
-    // ✅ 실제 점수 저장 (정규화하지 않음)
-    subjectScores[subjectType] = rawScore;
-    console.log(`    ✅ 저장된 점수: ${rawScore}`);
   }
 
-  console.log(`\n- calculation_type: ${department.calculation_type}`);
-  console.log(`- subjectScores:`, subjectScores);
-  
-  if (department.calculation_type === '기본비율') {
-    const result = await calculateBasicRatio(department, subjectScores, gradeMap, userScores, scoreConfigs);
-    console.log(`✅ 기본비율 계산 결과: ${result}`);
-    return result;
-  } else if (department.calculation_type === '특수공식') {
-    const result = await calculateSpecialFormula(department, subjectScores, gradeMap, userScores, scoreConfigs);
-    console.log(`✅ 특수공식 계산 결과: ${result}`);
-    return result;
-  }
+  console.log(`\n- calculatedScores:`, calculatedScores);
 
-  console.log(`❌ calculation_type이 매칭되지 않아 null 반환`);
-  return null;
-}
-
-// ✅ 기본비율 계산 (정규화 제거)
-async function calculateBasicRatio(department, subjectScores, gradeMap, userScores, scoreConfigs) {
-  console.log('\n  💰 기본비율 계산 시작');
-  
-  // priority_group 체크
-  const hasPriorityGroup = scoreConfigs.some(sc => sc.priority_group !== null);
-  console.log(`    - hasPriorityGroup: ${hasPriorityGroup}`);
-
-  if (hasPriorityGroup) {
-    return await calculateWithPriorityGroup(department, subjectScores, gradeMap, userScores, scoreConfigs);
-  }
-
-  // 단순 비율 계산
+  // 5. DepartmentScoreRule 적용하여 최종 점수 계산
   let totalScore = 0;
 
-  // 국어
-  if (department.korean_ratio && subjectScores.korean !== undefined) {
-    const score = subjectScores.korean * department.korean_ratio;
-    console.log(`    - 국어: ${subjectScores.korean} × ${department.korean_ratio} = ${score.toFixed(2)}`);
-    totalScore += score;
-  } else {
-    console.log(`    - 국어: 스킵 (ratio=${department.korean_ratio}, score=${subjectScores.korean})`);
-  }
+  for (const rule of scoreRules) {
+    const subjectGroup = rule.subject_group; // [1, 2] 형태
+    const pickCount = rule.pick_count;
+    const weightType = rule.weight_type; // FIXED or RANK
+    const weights = rule.weights; // [30, 30] 또는 [50, 30, 20] 형태
 
-  // 수학
-  if (department.math_ratio && subjectScores.math !== undefined) {
-    const score = subjectScores.math * department.math_ratio;
-    console.log(`    - 수학: ${subjectScores.math} × ${department.math_ratio} = ${score.toFixed(2)}`);
-    totalScore += score;
-  } else {
-    console.log(`    - 수학: 스킵 (ratio=${department.math_ratio}, score=${subjectScores.math})`);
-  }
+    console.log(`\n  📋 규칙 적용: subjects=${JSON.stringify(subjectGroup)}, pick=${pickCount}, type=${weightType}`);
 
-  // 탐구
-  if (department.inquiry_ratio && subjectScores.inquiry !== undefined) {
-    const score = subjectScores.inquiry * department.inquiry_ratio;
-    console.log(`    - 탐구: ${subjectScores.inquiry} × ${department.inquiry_ratio} = ${score.toFixed(2)}`);
-    totalScore += score;
-  } else {
-    console.log(`    - 탐구: 스킵 (ratio=${department.inquiry_ratio}, score=${subjectScores.inquiry})`);
-  }
-
-  // 영어
-  if (department.english_ratio && subjectScores.english !== undefined) {
-    const score = subjectScores.english * department.english_ratio;
-    console.log(`    - 영어: ${subjectScores.english} × ${department.english_ratio} = ${score.toFixed(2)}`);
-    totalScore += score;
-  } else {
-    console.log(`    - 영어: 스킵 (ratio=${department.english_ratio}, score=${subjectScores.english})`);
-  }
-
-  // 한국사 가산점
-  const historyScore = getHistoryScore(department, gradeMap, userScores);
-  console.log(`    - 한국사: ${historyScore} (type: ${department.history_conversion_type})`);
-  
-  if (department.history_conversion_type === 'A_ADD') {
-    totalScore += historyScore;
-  } else if (department.history_conversion_type === 'B_ADD') {
-    totalScore = (totalScore + historyScore);
-  }
-
-  console.log(`    - 최종 totalScore: ${totalScore.toFixed(2)}`);
-
-  return Math.round(totalScore * 100) / 100;
-}
-
-// ✅ priority_group 처리 (남은 비율 계산 로직)
-async function calculateWithPriorityGroup(department, subjectScores, gradeMap, userScores, scoreConfigs) {
-  console.log('\n  🎯 priority_group 계산 시작');
-  
-  const groups = {};
-  
-  scoreConfigs.forEach(config => {
-    const groupId = config.priority_group || 0;
-    if (!groups[groupId]) {
-      groups[groupId] = [];
-    }
-    groups[groupId].push(config);
-  });
-
-  let totalScore = 0;
-  let group0RatioSum = 0;
-
-  // 1️⃣ 그룹 0 (고정 과목) 처리 및 비율 합 계산
-  if (groups['0']) {
-    console.log(`    - 그룹 0 처리 (과목 수: ${groups['0'].length})`);
-    
-    for (const config of groups['0']) {
-      const score = getSubjectRatioScore(config, subjectScores, department);
-      if (score !== null) {
-        console.log(`      + ${config.subject_type}: ${score.toFixed(2)}`);
-        totalScore += score;
+    if (weightType === 'FIXED') {
+      // FIXED: 모든 과목을 고정 비율로 반영
+      for (let i = 0; i < subjectGroup.length; i++) {
+        const subjectId = subjectGroup[i];
+        const weight = weights[i] || 0;
+        const score = calculatedScores[subjectId] || 0;
         
-        // 비율 합산
-        if (config.subject_type === 'korean') group0RatioSum += department.korean_ratio || 0;
-        else if (config.subject_type === 'math') group0RatioSum += department.math_ratio || 0;
-        else if (config.subject_type === 'inquiry') group0RatioSum += department.inquiry_ratio || 0;
-        else if (config.subject_type === 'english') group0RatioSum += department.english_ratio || 0;
+        const weightedScore = score * (weight / 100);
+        totalScore += weightedScore;
+        
+        console.log(`    + 과목 ${subjectId}: ${score} × ${weight}% = ${weightedScore.toFixed(2)}`);
       }
-    }
-    
-    console.log(`      → 그룹 0 비율 합: ${group0RatioSum.toFixed(3)} (${(group0RatioSum * 100).toFixed(1)}%)`);
-  }
-
-  // 2️⃣ 그룹 1+ (선택 과목) 처리
-  for (const [groupId, configs] of Object.entries(groups)) {
-    if (groupId === '0') continue; // 이미 처리함
-    
-    console.log(`    - 그룹 ${groupId} 처리 (과목 수: ${configs.length})`);
-    
-    const candidateScores = [];
-    
-    for (const config of configs) {
-      const subjectType = config.subject_type;
-      const rawScore = subjectScores[subjectType];
+    } else if (weightType === 'RANK') {
+      // RANK: 상위 N개 과목을 순위별 비율로 반영
+      const candidates = [];
       
-      if (rawScore !== undefined) {
-        let ratio = 0;
-        if (subjectType === 'korean') ratio = department.korean_ratio || 0;
-        else if (subjectType === 'math') ratio = department.math_ratio || 0;
-        else if (subjectType === 'inquiry') ratio = department.inquiry_ratio || 0;
-        else if (subjectType === 'english') ratio = department.english_ratio || 0;
-        
-        if (ratio > 0) {
-          candidateScores.push({
-            subject: subjectType,
-            score: rawScore * ratio,
-            ratio: ratio
-          });
+      for (const subjectId of subjectGroup) {
+        const score = calculatedScores[subjectId];
+        if (score !== undefined && score !== null) {
+          candidates.push({ subjectId, score });
         }
       }
-    }
 
-    if (candidateScores.length === 0) {
-      console.log(`      ⚠️ 선택 가능한 과목이 없음`);
-      continue;
+      // 점수 높은 순 정렬
+      candidates.sort((a, b) => b.score - a.score);
+      
+      // 상위 pickCount개 선택
+      const selected = candidates.slice(0, pickCount);
+      
+      console.log(`    → ${candidates.length}개 중 상위 ${pickCount}개 선택`);
+      
+      for (let i = 0; i < selected.length; i++) {
+        const { subjectId, score } = selected[i];
+        const weight = weights[i] || 0;
+        
+        const weightedScore = score * (weight / 100);
+        totalScore += weightedScore;
+        
+        console.log(`    + ${i + 1}등 과목 ${subjectId}: ${score} × ${weight}% = ${weightedScore.toFixed(2)}`);
+      }
     }
-
-    // 점수 높은 순으로 정렬
-    candidateScores.sort((a, b) => b.score - a.score);
-    
-    // 3️⃣ 남은 비율 계산 및 선택 개수 결정
-    const remainingRatio = 1.0 - group0RatioSum;
-    const firstRatio = candidateScores[0]?.ratio || 0.333;
-    const selectionCount = Math.round(remainingRatio / firstRatio);
-    
-    console.log(`      → 남은 비율: ${remainingRatio.toFixed(3)} (${(remainingRatio * 100).toFixed(1)}%)`);
-    console.log(`      → 과목당 비율: ${firstRatio.toFixed(3)}`);
-    console.log(`      → 선택 개수: ${selectionCount}개`);
-    
-    const selectedScores = candidateScores.slice(0, selectionCount);
-    
-    console.log(`      상위 ${selectionCount}개 선택:`);
-    selectedScores.forEach(s => {
-      console.log(`        + ${s.subject}: ${s.score.toFixed(2)}`);
-      totalScore += s.score;
-    });
   }
 
-  // 4️⃣ 한국사 가산점
+  // 6. 한국사 가산점
   const historyScore = getHistoryScore(department, gradeMap, userScores);
-  console.log(`    - 한국사: ${historyScore}`);
-  
+  console.log(`\n  📚 한국사 가산점: ${historyScore} (type: ${department.history_conversion_type})`);
+
   if (department.history_conversion_type === 'A_ADD') {
     totalScore += historyScore;
   } else if (department.history_conversion_type === 'B_ADD') {
-    totalScore = (totalScore + historyScore);
+    totalScore = totalScore + historyScore;
   }
 
-  console.log(`    - 최종 totalScore: ${totalScore.toFixed(2)}`);
+  console.log(`\n  ✅ 최종 점수: ${totalScore.toFixed(2)}`);
 
   return Math.round(totalScore * 100) / 100;
 }
 
-// ✅ 과목별 점수 계산 (간단하게)
-function getSubjectRatioScore(config, subjectScores, department) {
-  const subjectType = config.subject_type;
-  const rawScore = subjectScores[subjectType];
-  
-  if (rawScore === undefined) return null;
+// 과목별 점수 계산
+async function calculateSubjectScore(subjectId, scoreType, config, userScores, maxScoreMap, gradeMap, department) {
+  // subjectId로 해당 과목 데이터 찾기
+  let subjectData = null;
+  let subjectName = '';
 
-  let ratio = 0;
-  if (subjectType === 'korean') ratio = department.korean_ratio || 0;
-  else if (subjectType === 'math') ratio = department.math_ratio || 0;
-  else if (subjectType === 'inquiry') ratio = department.inquiry_ratio || 0;
-  else if (subjectType === 'english') ratio = department.english_ratio || 0;
-
-  return rawScore * ratio;
-}
-
-// 특수공식 계산
-async function calculateSpecialFormula(department, subjectScores, gradeMap, userScores, scoreConfigs) {
-  console.log('\n  🔮 특수공식 계산');
-  
-  if (!department.special_formula) {
-    console.log('    - special_formula 없음, 기본비율로 계산');
-    return await calculateBasicRatio(department, subjectScores, gradeMap, userScores, scoreConfigs);
+  // subjectId로 과목 찾기
+  for (const [key, value] of Object.entries(userScores)) {
+    if (value && value.subjectId === subjectId) {
+      subjectData = value;
+      subjectName = key;
+      break;
+    }
   }
 
-  console.log(`    - special_formula: ${department.special_formula}`);
-  return await calculateBasicRatio(department, subjectScores, gradeMap, userScores, scoreConfigs);
-}
-
-// 과목 점수 가져오기
-function getSubjectScore(userScores, subject, scoreType) {
-  const subjectData = userScores[subject];
-  
-  console.log(`      [getSubjectScore] subject=${subject}, scoreType=${scoreType}`);
-  console.log(`      [getSubjectScore] subjectData:`, subjectData);
-  
   if (!subjectData) {
-    console.log(`      [getSubjectScore] subjectData 없음!`);
+    console.log(`    ⚠️ 과목 ${subjectId} 데이터 없음`);
     return null;
   }
+
+  console.log(`    - 과목명: ${subjectName}`);
+
+  // 등급 변환 (영어, 한국사)
+  if (scoreType === 'grade_conversion') {
+    const grade = subjectData.grade;
+    console.log(`    - 등급: ${grade}`);
+    
+    const subjectCode = subjectName === 'english' ? 'ENGLISH' : 'K_HISTORY';
+    
+    if (gradeMap[subjectCode] && gradeMap[subjectCode][grade]) {
+      const convertedScore = gradeMap[subjectCode][grade];
+      console.log(`    - 변환 점수: ${convertedScore}`);
+      return convertedScore;
+    }
+    
+    // 기본값
+    if (subjectName === 'english') {
+      return getDefaultEnglishScore(grade, 100);
+    }
+    
+    return 0;
+  }
+
+  // 표준점수, 백분위, 변환표준점수
+  let rawScore = null;
 
   if (scoreType === '표준점수') {
-    const score = subjectData.standard_score || null;
-    console.log(`      [getSubjectScore] 표준점수: ${score}`);
-    return score;
+    rawScore = subjectData.standard_score;
   } else if (scoreType === '백분위') {
-    const score = subjectData.percentile || null;
-    console.log(`      [getSubjectScore] 백분위: ${score}`);
-    return score;
+    rawScore = subjectData.percentile;
   } else if (scoreType === '변환표준점수') {
-    const score = subjectData.converted_standard_score || null;
-    console.log(`      [getSubjectScore] 변환표준점수: ${score}`);
-    return score;
+    rawScore = subjectData.converted_standard_score;
   }
 
-  console.log(`      [getSubjectScore] scoreType 매칭 안됨: ${scoreType}`);
-  return null;
-}
+  console.log(`    - 원점수 (${scoreType}): ${rawScore}`);
 
-// 탐구 점수 가져오기
-function getInquiryScore(userScores, scoreType, inquirySubjectCount) {
-  const inquiry1 = userScores.inquiry1;
-  const inquiry2 = userScores.inquiry2;
-
-  console.log(`      [getInquiryScore] inquiry1:`, inquiry1);
-  console.log(`      [getInquiryScore] inquiry2:`, inquiry2);
-  console.log(`      [getInquiryScore] scoreType: ${scoreType}, count: ${inquirySubjectCount}`);
-
-  if (!inquiry1) {
-    console.log(`      [getInquiryScore] inquiry1 없음!`);
+  if (rawScore === null || rawScore === undefined) {
     return null;
   }
 
-  let score1 = null;
-  let score2 = null;
-
-  if (scoreType === '표준점수') {
-    score1 = inquiry1.standard_score;
-    score2 = inquiry2?.standard_score;
-  } else if (scoreType === '백분위') {
-    score1 = inquiry1.percentile;
-    score2 = inquiry2?.percentile;
-  } else if (scoreType === '변환표준점수') {
-    score1 = inquiry1.converted_standard_score;
-    score2 = inquiry2?.converted_standard_score;
-  }
-
-  console.log(`      [getInquiryScore] score1: ${score1}, score2: ${score2}`);
-
-  if (score1 === null || score1 === undefined) {
-    console.log(`      [getInquiryScore] score1이 null/undefined`);
-    return null;
-  }
-
-  if (inquirySubjectCount === 1) {
-    if (score2 !== null && score2 !== undefined) {
-      const result = Math.max(score1, score2);
-      console.log(`      [getInquiryScore] 1과목 선택 (max): ${result}`);
-      return result;
+  // 탐구 과목 처리 (2과목 평균 등)
+  if (subjectName === 'inquiry1' && department.inquiry_subject_count === 2) {
+    const inquiry2Data = userScores.inquiry2;
+    if (inquiry2Data) {
+      let score2 = null;
+      if (scoreType === '표준점수') score2 = inquiry2Data.standard_score;
+      else if (scoreType === '백분위') score2 = inquiry2Data.percentile;
+      else if (scoreType === '변환표준점수') score2 = inquiry2Data.converted_standard_score;
+      
+      if (score2 !== null && score2 !== undefined) {
+        rawScore = (rawScore + score2) / 2;
+        console.log(`    - 탐구 2과목 평균: ${rawScore}`);
+      }
     }
-    console.log(`      [getInquiryScore] 1과목만: ${score1}`);
-    return score1;
   }
 
-  if (inquirySubjectCount === 2) {
-    if (score2 !== null && score2 !== undefined) {
-      const result = (score1 + score2) / 2;
-      console.log(`      [getInquiryScore] 2과목 평균: ${result}`);
-      return result;
-    }
-    console.log(`      [getInquiryScore] 2과목이지만 1개만: ${score1}`);
-    return score1;
-  }
-
-  return score1;
+  return rawScore;
 }
 
-// ✅ 최고점 가져오기 (키 수정)
-function getMaxScore(config, maxScoreMap) {
-  if (config.max_score_method === 'fixed_200') {
-    return 200;
-  } else if (config.max_score_method === 'fixed_100') {
-    return 100;
-  } else if (config.max_score_method === 'highest_of_year') {
-    if (config.subject_type === 'korean') {
-      return maxScoreMap['KOR_MAX'] || 150;  // ✅ 수정
-    } else if (config.subject_type === 'math') {
-      return maxScoreMap['MATH_MAX'] || 150;  // ✅ 수정
-    } else if (config.subject_type === 'inquiry') {
-      return maxScoreMap['INQUIRY_MAX'] || 70;  // ✅ 수정
-    }
-  } else if (config.max_score_value) {
-    return config.max_score_value;
-  }
-
-  // 백분위는 100
-  if (config.score_type === '백분위') {
-    return 100;
-  }
-
-  return 100;
-}
-
-// 한국사 점수 가져오기
+// 한국사 점수
 function getHistoryScore(department, gradeMap, userScores) {
   const historyGrade = userScores.korean_history?.grade;
   if (!historyGrade) return 0;
@@ -680,7 +486,6 @@ function getHistoryScore(department, gradeMap, userScores) {
     return gradeMap.K_HISTORY[historyGrade];
   }
 
-  // 기본 가산점
   const defaultHistoryScores = {
     1: 10, 2: 10, 3: 10, 4: 10, 5: 10,
     6: 8, 7: 6, 8: 4, 9: 2
@@ -689,20 +494,13 @@ function getHistoryScore(department, gradeMap, userScores) {
   return defaultHistoryScores[historyGrade] || 0;
 }
 
-// 영어 기본 점수 (gradeMap이 없을 때)
+// 영어 기본 점수
 function getDefaultEnglishScore(grade, maxScore) {
   if (!grade) return 0;
   
   const gradeRatios = {
-    1: 1.0,   // 100%
-    2: 0.95,  // 95%
-    3: 0.9,   // 90%
-    4: 0.85,  // 85%
-    5: 0.8,   // 80%
-    6: 0.75,  // 75%
-    7: 0.7,   // 70%
-    8: 0.65,  // 65%
-    9: 0.6    // 60%
+    1: 1.0, 2: 0.95, 3: 0.9, 4: 0.85, 5: 0.8,
+    6: 0.75, 7: 0.7, 8: 0.65, 9: 0.6
   };
   
   return (gradeRatios[grade] || 0) * maxScore;

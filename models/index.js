@@ -11,8 +11,9 @@ const Subject = require("./Subject");
 const SubjectOption = require("./SubjectOption");
 const ExamScore = require("./ExamScore");
 
-// --- [신규 모델 불러오기] ---
-const DepartmentScoreConfig = require("./DepartmentScoreConfig");
+// --- [점수 계산 관련 모델] ---
+const DepartmentScoreRule = require("./DepartmentScoreRule");
+const DepartmentSubjectConfig = require("./DepartmentSubjectConfig");
 const CollegeMaxScore = require("./CollegeMaxScore");
 const GradeConversion = require("./GradeConversion");
 // -----------------------------
@@ -28,9 +29,14 @@ Department.hasMany(UserChoice, { foreignKey: "departmentId" });
 UserChoice.belongsTo(Department, { foreignKey: "departmentId" });
 
 // 2. [추가] 새로운 계산 로직 관계 설정
-// Department <-> DepartmentScoreConfig (학과별 정규화 기준)
-Department.hasMany(DepartmentScoreConfig, { foreignKey: "departmentId", onDelete: "CASCADE" });
-DepartmentScoreConfig.belongsTo(Department, { foreignKey: "departmentId" });
+
+// Department <-> DepartmentScoreRule (학과별 점수 반영 규칙)
+Department.hasMany(DepartmentScoreRule, { foreignKey: "departmentId", onDelete: "CASCADE" });
+DepartmentScoreRule.belongsTo(Department, { foreignKey: "departmentId" });
+
+// Department <-> DepartmentSubjectConfig (학과별 과목 설정)
+Department.hasMany(DepartmentSubjectConfig, { foreignKey: "departmentId", onDelete: "CASCADE" });
+DepartmentSubjectConfig.belongsTo(Department, { foreignKey: "departmentId" });
 
 // Department <-> GradeConversion (학과별 등급 변환표)
 Department.hasMany(GradeConversion, { foreignKey: "departmentId", onDelete: "CASCADE" });
@@ -47,8 +53,9 @@ module.exports = {
     Subject,
     SubjectOption,
     ExamScore,
-    // --- [신규 모델 Export] ---
-    DepartmentScoreConfig,
+    // --- [점수 계산 모델 Export] ---
+    DepartmentScoreRule,
+    DepartmentSubjectConfig,
     CollegeMaxScore,
     GradeConversion
 };
