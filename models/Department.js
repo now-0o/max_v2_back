@@ -46,11 +46,17 @@ const Department = sequelize.define("Department", {
         defaultValue: 1,
         comment: '탐구 과목 수 (1: 상위 1개만, 2: 2과목 평균)'
     },
+    english_conversion_type: {
+        type: DataTypes.ENUM('A_ADD', 'B_ADD', 'NONE'),
+        allowNull: false,
+        defaultValue: 'NONE',
+        comment: '영어 가산점/감점 적용 유형 (A: 선 비율 후 가산, B: 선 가산 후 비율, NONE: 반영비율 포함)'
+    },
     history_conversion_type: {
         type: DataTypes.ENUM('A_ADD', 'B_ADD', 'NONE'),
         allowNull: false,
         defaultValue: 'NONE',
-        comment: '한국사 가산점 적용 유형 (A: 선 비율 후 가산, B: 선 가산 후 비율)'
+        comment: '한국사 가산점 적용 유형 (A: 선 비율 후 가산, B: 선 가산 후 비율, NONE: 반영비율 포함)'
     },
     cutline_score: {
         type: DataTypes.FLOAT,

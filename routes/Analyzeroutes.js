@@ -383,7 +383,22 @@ async function calculateDepartmentScore(department, userScores, maxScoreMap) {
     }
   }
 
-  // 6. 한국사 가산점
+  // 6. 영어 가산/감점 처리
+  const englishScore = getEnglishScore(department, gradeMap, userScores);
+  console.log(`\n  🔤 영어 처리: ${englishScore} (type: ${department.english_conversion_type})`);
+
+  if (department.english_conversion_type === 'A_ADD') {
+    // 반영비율 계산 후 영어 가산/감점
+    totalScore += englishScore;
+    console.log(`    → 반영비율 후 영어 가산/감점: ${totalScore.toFixed(2)}`);
+  } else if (department.english_conversion_type === 'B_ADD') {
+    // 영어 가산/감점 후 반영비율 계산
+    totalScore = totalScore + englishScore;
+    console.log(`    → 영어 가산/감점 후 반영비율: ${totalScore.toFixed(2)}`);
+  }
+  // NONE인 경우는 이미 DepartmentScoreRule에 포함되어 계산됨
+
+  // 7. 한국사 가산점
   const historyScore = getHistoryScore(department, gradeMap, userScores);
   console.log(`\n  📚 한국사 가산점: ${historyScore} (type: ${department.history_conversion_type})`);
 
@@ -477,8 +492,36 @@ async function calculateSubjectScore(subjectId, scoreType, config, userScores, m
   return rawScore;
 }
 
+// 영어 점수 가져오기
+function getEnglishScore(department, gradeMap, userScores) {
+  // english_conversion_type이 NONE이면 0 반환 (이미 반영비율에 포함됨)
+  if (department.english_conversion_type === 'NONE') {
+    return 0;
+  }
+
+  const englishGrade = userScores.english?.grade;
+  if (!englishGrade) return 0;
+
+  if (gradeMap.ENGLISH && gradeMap.ENGLISH[englishGrade]) {
+    return gradeMap.ENGLISH[englishGrade];
+  }
+
+  // 기본값 (등급별 점수 없을 때)
+  const defaultEnglishScores = {
+    1: 100, 2: 95, 3: 90, 4: 85, 5: 80,
+    6: 75, 7: 70, 8: 65, 9: 60
+  };
+  
+  return defaultEnglishScores[englishGrade] || 0;
+}
+
 // 한국사 점수
 function getHistoryScore(department, gradeMap, userScores) {
+  // history_conversion_type이 NONE이면 0 반환 (이미 반영비율에 포함됨)
+  if (department.history_conversion_type === 'NONE') {
+    return 0;
+  }
+
   const historyGrade = userScores.korean_history?.grade;
   if (!historyGrade) return 0;
 
